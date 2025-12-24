@@ -126,25 +126,15 @@ bf16_mul_normalize:
     # s3: result_exp
     mul s2, t4, t5 # result_mant = mant_a * mant_b, need to modify later
     add s3, t2, t3 # result_exp = exp_a + exp_b
-    add s3, s3, s5 # result_exp += exp_adjust
+    sub s3, s3, s5 # result_exp - exp_adjust_b
+    sub s3, s3, s4 # result_exp - exp_adjust_a - exp_adjust_b
     addi s3, s3, -127 # result_exp -= BF16_EXP_BIAS
 
-bf16_mul_normalize_check: # branchless later
-
-bf16_mul_normalize_check_result_mant_if:
-    addi t6, x0, 0x80
-    slli t6, t6, 8
-    and t6, s2, t6 # use t6 to produce mask
-    srli t6, t6, 15
-    add s3, s3, t6 # result_exp += (result_mant & 0x8000) ? 1 : 0
-    addi t6, t6, 7 # shift amount = (result_mant & 0x8000) ? 8 : 7
-    srl s2, s2, t6 # result_mant >>= shift amount
-    andi s2, s2, 0x7F # result_mant 
-    jal x0, bf16_mul_normalize_check_result_exp_if_ge_0xFF
-
-bf16_mul_normalize_check_result_mant_else:
-    srli t6, s2, 7
-    andi s2, t6, 0x7F
+bf16_mul_normalize_check:
+    srli t6, s2, 15
+    addi t0, t6, 7 # t0 = (result_mant == 1) ? 8 : 7, shift_amount 
+    srl s2, s2, t0 # result_mant >>= (shift_amount)
+    add s3, s3, t6  # result_exp += t6
 
 bf16_mul_normalize_check_result_exp_if_ge_0xFF:
     addi t6, x0, 0xFF
@@ -153,10 +143,10 @@ bf16_mul_normalize_check_result_exp_if_ge_0xFF:
 bf16_mul_normalize_check_result_exp_if_le_0:
     bgt s3, x0, bf16_mul_return
     addi t6, x0, -6
-    bgt s3, t6, bf16_mul_return_zero
+    blt s3, t6, bf16_mul_return_zero
     addi t6, x0, 1
     sub t6, t6, s3 # t6 = 1 - result_exp
-    sll s2, s2, t6
+    srl s2, s2, t6
     addi s3, x0, 0
 
 bf16_mul_return:
