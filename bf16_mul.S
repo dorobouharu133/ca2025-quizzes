@@ -134,12 +134,13 @@ bf16_mul_normalize_check: # branchless later
 bf16_mul_normalize_check_result_mant_if:
     addi t6, x0, 0x80
     slli t6, t6, 8
-    and t6, s2, t6
-    beq t6, x0,  bf16_mul_normalize_check_result_mant_else
-    srli t6, s2, 8
-    andi s2, t6, 0xFF
-    addi s3, s3, 1
-    jal x0, bf16_mul_normalize_check_result_exp_if_ge_0xFF 
+    and t6, s2, t6 # use t6 to produce mask
+    srli t6, t6, 15
+    add s3, s3, t6 # result_exp += (result_mant & 0x8000) ? 1 : 0
+    addi t6, t6, 7 # shift amount = (result_mant & 0x8000) ? 8 : 7
+    srl s2, s2, t6 # result_mant >>= shift amount
+    andi s2, s2, 0x7F # result_mant 
+    jal x0, bf16_mul_normalize_check_result_exp_if_ge_0xFF
 
 bf16_mul_normalize_check_result_mant_else:
     srli t6, s2, 7
