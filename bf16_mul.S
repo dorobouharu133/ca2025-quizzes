@@ -1,3 +1,6 @@
+.global bf16_mul
+.global shift_and_add
+
 # a0: a
 # a1: b
 # t0: sign_a
@@ -124,7 +127,19 @@ bf16_mul_exp_adjust_b: # normalize b
 bf16_mul_normalize:
     # s2: result_mant
     # s3: result_exp
-    mul s2, t4, t5 # result_mant = mant_a * mant_b, need to modify later
+    # mul s2, t4, t5 # result_mant = mant_a * mant_b
+    addi sp, sp, -12
+    sw ra, 0(sp)
+    sw a0, 4(sp)
+    sw a1, 8(sp)
+    addi a0, t4, 0
+    addi a1, t5, 0
+    jal ra, shift_and_add
+    addi s2, a0, 0
+    lw ra, 0(sp)
+    lw a0, 4(sp)
+    lw a1, 8(sp)
+    addi sp, sp, 12
     add s3, t2, t3 # result_exp = exp_a + exp_b
     sub s3, s3, s5 # result_exp - exp_adjust_b
     sub s3, s3, s4 # result_exp - exp_adjust_a - exp_adjust_b
@@ -184,3 +199,35 @@ bf16_mul_return_zero:
     addi a0, s0, 0
     slli a0, a0, 15
     jr ra
+
+# a0: multiplicand
+# a1: multiplier
+# t0: accumulator
+# t1: multiplier_copy
+# t2: bit0
+shift_and_add:
+    addi sp, sp, -12
+    sw t0, 0(sp)
+    sw t1, 4(sp)
+    sw t2, 8(sp)
+    
+    addi t0, x0, 0
+    addi t1, a1, 0
+    andi t2, a1, 1
+shift_and_add_for_loop:
+    andi t2, t1, 1
+    beq t2, x0, shift_and_add_for_skip_add
+    add t0, t0, a0
+    
+shift_and_add_for_skip_add:    
+    slli a0, a0, 1
+    srli t1, t1, 1
+    bne t1, x0, shift_and_add_for_loop
+shfit_and_add_end:
+    addi a1, t0, 0
+    lw t0, 0(sp)
+    lw t1, 4(sp)
+    lw t2, 8(sp)
+    addi sp, sp, 12
+    addi a0, a1, 0
+    jr ra 
