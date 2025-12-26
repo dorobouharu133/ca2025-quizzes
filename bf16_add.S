@@ -7,10 +7,6 @@
 # t4: mant_a
 # t5: mant_b
 # t6: temp
-# s0: exp_diff
-# s1: result_sign
-# s2: result_exp
-# s3: result_mant
 bf16_add:
     srli t0, a0, 15
     andi t0, t0, 1 # sign_a = (a.bits >> 15) & 1
@@ -43,72 +39,110 @@ bf16_add_skip1:
     ori t5, t5, 0x80 # mant_b |= 0x80
 
 bf16_add_skip2:
-    sub s0, t2, t3 # exp_diff = exp_a - exp_b
+bf16_add_align_branchless:
+    # a0: a
+    # a1: b
+    # s0: unsigned_a
+    # s1: unsigned_b
+    # t6: temp, used as mask
+    addi t6, x0, 0x7F
+    slli t6, t6, 8 
+    ori t6, t6, 0xFF # mask = 0x7FFF
+
+    andi s0, a0, t6 # unsigned_a = a.bits & mask
+    andi s1, a1, t6 # unsigned_b = b.bits & mask
+    slt t6, s0, s1 # t6 = (|A| < |B|) ? 1 : 0
+    sub t6, x0, t6 # t6 = (|A| < |B|) ? 0xFFFF : 0x0
     
-bf16_add_align_if: # need to be improved
-    ble s0, x0, bf16_add_align_else_if
-    addi s2, t2, 0 # result_exp = exp_a
-    li t6, 8
-    bgt s0, t6, bf16_add_return_a
-    srl t5, t5, s0 # mant_b >>= exp_diff
-    jal x0, bf16_add_align_done
+bf16_add_branchless_swap_sign:
+    # swap sign bit
+    # t0: sign_a
+    # t1: sign_b
+    # t6: mask (0xFFFF or 0x0000)
+    # s0: sign_a ^ sign_b
+    xor s0, t0, t1 # s0 = sign_a ^ sign_b
+    and s0, s0, t6 # use mask to check swap or not
+    xor t0, t0, s0
+    xor t1, t1, s0
 
-bf16_add_align_else_if:
-    beq s0, x0, bf16_add_align_else
-    addi s2, t3, 0 # result_exp = exp_b
-    li t6, -8
-    blt s0, t6, bf16_add_return_b
-    neg t6, s0
-    srl t4, t4, t6 # mant_a >>= -exp_diff
-    jal x0, bf16_add_align_done
+bf16_add_branchless_swap_exponent:
+    # swap exponent
+    # t2: exp_a
+    # t3: exp_b
+    # t6: mask (0xFFFF or 0x0000)
+    # s0: exp_a ^ exp_b
+    xor s0, t2, t3 # s0 = exp_a ^ exp_b
+    and s0, s0, t6
+    xor t2, t2, s0
+    xor t3, t3, s0
+    
+bf16_add_branchless_swap_mantissa:
+    # swap mantissa
+    # t4: mant_a
+    # t5: mant_b
+    # t6: mask (0xFFFF or 0x0000)
+    # s0: mant_a ^ mant_b
+    xor s0, t4, t5 # s0 = mant_a ^ mant_b
+    and s0, s0, t6
+    xor t4, t4, s0
+    xor t5, t5, s0
 
-bf16_add_align_else:
-    addi s2, t2, 0 # result_exp = exp_a
+    # s3: exp_diff
+    # t6: mask
+    sub s3, t2, t3 # exp_diff = exp_a - exp_b
+    
+    addi t6, x0, 8
+    slt t6, t6, s3
+    sub t6, x0, t6 # t6 = (8 < exp_diff) ? 0xFFFF : 0
+    xori t6, t6, -1 # t6 = ~t6
+    
+    # align mant_b
+    sra t5, t5, s3 # mant_b >>= exp_diff
+    and t5, t5, t6 # mant_b &= ~mask
 
-bf16_add_align_done:
-    bne t0, t1, bf16_add_skip1 # if(sign_a != sign_b) goto bf16_add_skip1
-    addi s1, t0, 0 # result_sign = sign_a
+bf16_add_sign_compare:
+    # t0: sign_a 
+    # t1: sign_b 
+    # t4: mant_a
+    # t5: mant_b
+    # s1: exp_a (bigger)
+    xor t6, t0, t1 
+    bne t6, x0, bf16_add_diff_sign
+
+bf16_add_same_sign: 
     add s3, t4, t5 # result_mant = mant_a + mant_b
-    andi t6, s3, 0x100
-    beq t6, x0, bf16_add_return # if (result_mant & 0x100) == 0 return bf16_add_return
-    srli s3, s3, 1 # result_mant >>= 1
-    addi s2, s2, 1 # result_exp += 1
-    li t6, 0xFF
-    blt s2, t6, bf16_add_return # if (result_exp < 0xFF) return bf16_add_return
-    slli a0, s1, 15 # result_sign << 15
-    li t6, 0x7F80
-    or a0, a0, t6 # result_sign << 15 | 0x7F80
-    jr ra
 
-bf16_add_skip3:
-    blt t4, t5, bf16_add_skip4
-    addi s1, t0, 0 # result_sign = sign_a
-    sub s3, t4, t5 # result_mant = mant_a - mant_b
-    jal x0, bf16_add_skip5
-    
-bf16_add_skip4:
-    addi s1, t1, 0 # result_sign = sign_b
-    sub s3, t5, t4 # result_mant = mant_b - mant_a
-    
-bf16_add_skip5:
+    andi t2, s3, 0x100 # result & 0x100, check if carry out
+    beq t2, x0, bf16_add_return 
+    srli s3, s3, 1 # result_mant >>= 1
+    addi s1, s1, 1 # result_exp += 1
+    addi t6, x0, 0xFF # check for overflow 
+    bge s1, t6, bf16_add_return_overflow    
+    jal x0, bf16_add_return
+
+bf16_add_diff_sign: 
+    sub s3, t4, t5 # result_mant = mant_a - mant_b 
     beq s3, x0, bf16_add_return_bf16_zero
-    
-bf16_add_while:
-    li t6, 0x80
-    and t6, s3, t6
-    beq t6, x0, bf16_add_return
-    slli s3, s3, 1
-    addi s2, s2, -1
-    ble s2, x0, bf16_add_return_bf16_zero
-    jal x0, bf16_add_while
+
+bf16_add_normalize_loop: # normalize, maybe can optimize later
+    andi t6, s3, 0x400 
+    bne t6, x0, bf16_add_return 
+    slli s3, s3, 1 # result_mant <<= 1
+    addi s1, s1, -1 # result_exp -= 1
+    blt s1, x0, bf16_add_return_bf16_zero
+    jal x0, bf16_add_normalize_loop
 
 bf16_add_return:
-    slli t6, s1, 15 # result_sign << 15
-    andi a0, s2, 0xFF # result_exp & 0xFF
-    slli a0, a0, 7 # (result_exp & 0xFF) << 7
-    or t6, a0, t6 # result_sign << 15 | (result_exp & 0xFF) << 7
-    andi t6, s3, 0x7F # result_mant & 0x7F
-    or a0, t6, a0 # result_sign << 15 | (result_exp & 0xFF) << 7 | (result_mant & 0x7F)
+    # t0: result_sign
+    # s1: result_exp
+    # s3: result_mant
+    srli s3, s3, 3
+    slli t0, t0, 15 # result_sign << 15
+    andi s1, s1, 0xFF # result_exp & 0xFF
+    slli s1, s1, 7 # result_exp << 7
+    andi s3, s3, 0x7F # result_mant & 0x7F
+    or a0, t0, s1
+    or a0, a0, s3
     jr ra
 
 bf16_add_return_a:
@@ -129,5 +163,13 @@ bf16_add_return_exp_b_0xFF:
     jal x0, bf16_add_return_bf16_nan # else return NaN
 
 bf16_add_return_bf16_zero:
-    li a0, 0x0000
+    addi a0, x0, 0
+    jr ra
+
+bf16_add_return_overflow:
+    slli t0, t0, 15 # result_sign << 15
+    addi t6, x0, 0x7F
+    slli t6, t6, 8
+    ori t6, t6, 0x80
+    or a0, t0, t6 # return Inf
     jr ra
