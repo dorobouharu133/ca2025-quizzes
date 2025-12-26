@@ -10,58 +10,80 @@ fail_msg: .string "Test failed!"
 
 main:
     la a0, start
-    li a7, 4
+    addi a7, x0, 4
     ecall
 test1:
-    li a0, 0x7F7F # maximal finite positive number  
-    li a1, 0x0080 # minimal normalized number
+    addi a0, x0, 0x7F
+    slli a0, a0, 8
+    ori a0, a0, 0x7F # maximal finite positive number  
+    addi a1, x0, 0x80 # minimal normalized number
     jal ra, bf16_mul
     addi t0, a0, 0
-    li t1, 0x407F
+    addi t1, x0, 0x40
+    slli t1, t1, 8
+    ori t1, t1, 0x7F
     bne a0, t1,test_fail 
     
 test2:
-    li a0, 0x7FC0 # NaN   
-    li a1, 0x3F80    
+    addi a0, x0, 0x7F
+    slli a0, a0, 8
+    ori a0, a0, 0xC0 # NaN
+    addi a1, x0, 0x3F 
+    slli a1, a1, 8
+    ori a1, a1, 0x80
     jal ra, bf16_mul
     addi t0, a0, 0
-    li t1, 0x7FC0 # NaN
+    addi t1, x0, 0x7F
+    slli t1, t1, 8
+    ori t1, t1, 0xC0 # NaN
     bne a0, t1,test_fail 
     
 test3:
-    li a0, 0x7F80 # +inf   
-    li a1, 0xFF80 # -inf 
+    addi a0, x0, 0x7F
+    slli a0, a0, 8
+    ori a0, a0, 0x80 # +inf   
+    addi a1, x0, 0xFF
+    slli a1, a1, 8
+    ori a1, a1, 0x80 # -inf
     jal ra, bf16_mul
     addi t0, a0, 0
-    li t1, 0xFF80 # +inf
+    addi t1, x0, 0xFF
+    slli t1, t1, 8
+    ori t1, t1, 0x80 # +inf
     bne a0, t1,test_fail
 
 test4:
-    li a0, 0x4040 # 3.000000   
-    li a1, 0x4000 # 2.000000
+    addi a0, x0, 0x40
+    slli a0, a0, 8
+    ori a0, a0, 0x40 # 3.000000
+    addi a1, x0, 0x40
+    slli a1, a1, 8
+    ori a1, a1, 0x00 # 2.000000
     jal ra, bf16_mul
     addi t0, a0, 0
-    li t1, 0x40C0 # 6.000000
+    addi t1, x0, 0x40
+    slli t1, t1, 8
+    ori t1, t1, 0xC0 # 6.000000
     bne a0, t1,test_fail  
     
 test_pass:
     la a0, pass_msg
-    li a7, 4
+    addi a7, x0, 4
     ecall
     jal new_line
 
 test_fail:
     la a0, fail_msg
-    li a7, 4
+    addi a7, x0, 4
     ecall
     
 new_line:
     la a0, newline
-    li a7, 4
+    addi a7, x0, 4
     ecall
 
 end:
-    li a7, 10
+    addi a7, x0, 10
     ecall
 
 # a0: a
