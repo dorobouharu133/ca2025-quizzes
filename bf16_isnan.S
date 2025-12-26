@@ -1,5 +1,7 @@
 bf16_isnan:
-    li t0, 0x7F80			# BF16_EXP_MASK
+    addi t0, 0x7F
+    slli t0, t0, 8
+    ori t0, t0, 0x80		# BF16_EXP_MASK
     and t1, a0, t0			# a.bits & BF16_EXP_MASK
     bne t1, t0, bf16_isnan_return_false
 
