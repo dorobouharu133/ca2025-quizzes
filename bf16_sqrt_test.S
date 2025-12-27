@@ -4,75 +4,107 @@ pass_msg: .string "All tests passed!"
 fail_msg: .string "Tests failed!"
 .text
 .global bf16_sqrt
-.global shift_and_add
 .global main
 
 main:
+# sqrt(+inf) = +inf
 test_1:
-    li a0, 0x7F80
+    addi a0, x0, 0x7F
+    slli a0, a0, 8
+    ori a0, a0, 0x80
     jal ra, bf16_sqrt   
 
     addi s0, a0, 0
-    li t0, 0x7F80
+    addi t0, x0, 0x7F
+    slli t0, t0, 8
+    ori t0, t0, 0x80
     bne s0, t0, test_failed
 
+# sqrt(NaN) = NaN
 test_2:
-    li a0, 0x7FC0	
+    addi a0, x0, 0x7F
+    slli a0, a0, 8
+    ori a0, a0, 0xC0	
     jal ra, bf16_sqrt   
 
     addi s0, a0, 0
-    li t0, 0x7FC0
+    addi t0, x0, 0x7F
+    slli t0, t0, 8
+    ori t0, t0, 0xC0
     bne s0, t0, test_failed
-    
+
+# sqrt(-1.000000) = NaN
 test_3:
-    li a0, 0xBF80	
+    addi a0, x0, 0xBF
+    slli a0, a0, 8
+    ori a0, a0, 0x80	
     jal ra, bf16_sqrt   
 
     addi s0, a0, 0
-    li t0, 0x7FC0
+    addi t0, x0, 0x7F
+    slli t0, t0, 8
+    ori t0, t0, 0xC0
     bne s0, t0, test_failed
-    
+
+# sqrt(2.000000) = 1.414062
 test_4:
-    li a0, 0x4000
+    addi a0, x0, 0x40
+    slli a0, a0, 8
     jal ra, bf16_sqrt   
 
     addi s0, a0, 0
-    li t0, 0x3FB5
+    addi t0, x0, 0x3F
+    slli t0, t0, 8
+    ori t0, t0, 0xB5
     bne s0, t0, test_failed
 
+# sqrt(1.000000) = 1.000000
 test_5:
-    li a0, 0x3F80       # 1.0
+    addi a0, x0, 0x3F
+    slli a0, a0, 8
+    ori a0, a0, 0x80
     jal ra, bf16_sqrt
-    li t0, 0x3F80       # sqrt(1.0) = 1.0
+    addi t0, x0, 0x3F
+    slli t0, t0, 8
+    ori t0, t0, 0x80
     bne a0, t0, test_failed
 
+# sqrt(0.000000) = 0.000000
 test_6:
-    li a0, 0x0000       # 0.0
+    addi a0, x0,
     jal ra, bf16_sqrt
-    li t0, 0x0000       # sqrt(0.0) = 0.0
+    addi t0, x0, 0x0000
     bne a0, t0, test_failed
 
+# sqrt(2648071397852762090550553127902248960.000000) = 1630303065108119552.000000
 test_7:
-    li a0, 0x7BFF      
+    addi a0, x0, 0x7B
+    slli a0, a0, 8
+    ori a0, a0, 0xFF      
     jal ra, bf16_sqrt
-    li t0, 0x5DB5       
+    addi t0, x0, 0x5D
+    slli a0, a0, 8
+    ori a0, a0, 0xB5       
     bne a0, t0, test_failed
 
 test_passed:
-    la a0, pass_msg
-    li a7, 4            
+    auipc a0, %pcrel_hi(pass_msg)
+    addi  a0, a0, %pcrel_lo(pass_msg)
+    addi a7, x0, 4            
     ecall
     jal x0, end
 test_failed:
-    la a0, fail_msg
-    li a7, 4            
+    auipc a0, %pcrel_hi(fail_msg)
+    addi  a0, a0, %pcrel_lo(fail_msg)
+    addi a7, x0, 4            
     ecall
 end:
-    la a0, newline
-    li a7, 4            
+    auipc a0, %pcrel_hi(newline)
+    addi  a0, a0, %pcrel_lo(newline)
+    addi a7, x0, 4            
     ecall
 
-    li a7, 10        
+    addi a7, x0, 10        
     ecall
  
 # a0: a
@@ -133,24 +165,10 @@ sqrt_while_loop: # binary_search
     bgt s0, s1, sqrt_normalize_greater_equal
     add s3, s0, s1 # s3 = (low + high)
     srli s3, s3, 1 # mid = (low + high) >> 1
-sqrt_mul: # SHIFT-AND-ADD
+sqrt_mul: ## mul is not allowed, need to be modified !!
     # s4: sq
-    # mid*mid implemented by shift-and-add
-    addi sp, sp, -12
-    sw ra, 0(sp)
-    sw a0, 4(sp)
-    sw a1, 8(sp)
-    
-    addi a0, s3, 0
-    addi a1, s3, 0
-    jal ra, shift_and_add
-    addi a3, a0, 0
-    
-    lw ra, 0(sp)
-    lw a0, 4(sp)
-    lw a1, 8(sp)
-    addi sp, sp, 12
-    addi s4, a3, 0
+    # mid*mid implement
+    mul s4, s3, s3 # sq = mid * mid, need to be replaced
     srli s4, s4, 7    
     
     # use branch
@@ -204,35 +222,3 @@ sqrt_return_pInf:
     slli a0, a0, 8
     ori  a0, a0, 0x80
     jr ra
-
-# a0: multiplicand
-# a1: multiplier
-# t0: accumulator
-# t1: multiplier_copy
-# t2: bit0
-shift_and_add:
-    addi sp, sp, -12
-    sw t0, 0(sp)
-    sw t1, 4(sp)
-    sw t2, 8(sp)
-    
-    addi t0, x0, 0
-    addi t1, a1, 0
-    andi t2, a1, 1
-shift_and_add_for_loop:
-    andi t2, t1, 1
-    beq t2, x0, shift_and_add_for_skip_add
-    add t0, t0, a0
-    
-shift_and_add_for_skip_add:    
-    slli a0, a0, 1
-    srli t1, t1, 1
-    bne t1, x0, shift_and_add_for_loop
-shfit_and_add_end:
-    addi a1, t0, 0
-    lw t0, 0(sp)
-    lw t1, 4(sp)
-    lw t2, 8(sp)
-    addi sp, sp, 12
-    addi a0, a1, 0
-    jr ra 
