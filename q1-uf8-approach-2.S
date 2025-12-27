@@ -22,7 +22,9 @@ newline: .string "\n"
 .globl main
 
 main:
-    li a0, 54372
+    # li a0, 54372
+    lui  a0, 13
+    addi a0, a0, 1124
     jal uf8_encode  # call function
     
     add s0, x0, a0       # save result
@@ -38,7 +40,7 @@ main:
     addi a7, x0, 10       # exit
     ecall
 
-#	a0: 	x
+#	a0: x
 #	t0:	n
 # 	t1:	c 
 #	t2:	y

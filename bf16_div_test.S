@@ -8,7 +8,7 @@ fail_msg: .string "Tests failed!"
 .globl main
 
 main:
-# 0x7F7F / 0x0080, maximal finite positive number / minimal normalized number
+# 0x7F7F / 0x0080, maximal finite positive number / minimal normalized number = +inf
 test_1:
     addi a0, x0, 0x7F
     slli a0, a0, 8
@@ -22,7 +22,7 @@ test_1:
     ori t0, t0, 0x80
     bne s0, t0, test_failed
 
-# NaN / 1.000000
+# NaN / 1.000000 = NaN
 test_2:
     addi a0, x0, 0x7F
     slli a0, a0, 8
