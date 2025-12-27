@@ -58,7 +58,7 @@ bf16_div_b_explicit_one:
     beq t3, x0, bf16_div_division
     ori t5, t5, 0x80 # mant_b |= 0x80
 
-bf16_div_division:
+bf16_div_division: # should be optimized
     # t6: loop times
     # s1: dividend
     # s2: divisor
@@ -108,17 +108,32 @@ bf16_div_normalize_quotient_if:
 
 bf16_div_normalize_quotient_else:
 
-bf16_div_normalize_quotient_while_loop:
-    addi t4, x0, 0x80
-    slli t4, t4, 8 # t6 = 0x8000
-    and t4, s3, t4 # t6 = quotient & 0x8000
-    bne t4, x0, bf16_div_normalize_quotient_while_loop_end
-    addi t6, x0, 1
-    ble s5, t6, bf16_div_normalize_quotient_while_loop_end
-    slli s3, s3, 1 # quotient <<= 1
-    addi s5, s5, -1 # result_exp -= 1
-    jal x0, bf16_div_normalize_quotient_while_loop
-bf16_div_normalize_quotient_while_loop_end:
+bf16_div_normalize_quotient_clz:
+    addi sp, sp, -8
+    sw ra, 0(sp)
+    sw a0, 4(sp)
+    
+    addi a0, s3, 0
+    jal ra, branchless_16_bit_clz
+    addi t6, a0, 0 # t6 = # of leading zeros
+
+    lw ra, 0(sp)
+    lw a0, 4(sp)
+    addi sp, sp, 8
+
+    addi t4, s5, -1 # t4 = result_exp - 1
+    bge t6, t4, bf16_div_normalize_quotient_clz_sub_result_exp_minus_1
+
+bf16_div_normalize_quotient_clz_sub_clz:
+    sub s5, s5, t6 # result_exp -= leading_zeros
+    sll s3, s3, t6 # quotient <<= leading_zeros
+    jal x0, bf16_div_normalize_quotient_clz_end
+
+bf16_div_normalize_quotient_clz_sub_result_exp_minus_1:
+    addi s5, x0, 1
+    sll s3, s3, t4
+
+bf16_div_normalize_quotient_clz_end:
     srli s3, s3, 8 # quotient >>= 8
 
 bf16_div_normalize_quotient_end:
@@ -135,7 +150,7 @@ bf16_div_return:
     andi s3, s3, 0x7F
     or a0, a0, s3
     jr ra
-    
+
 bf16_div_return_a:
     jr ra
 
