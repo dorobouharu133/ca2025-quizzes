@@ -66,7 +66,7 @@ bf16_add_align_else:
     addi s2, t2, 0 # result_exp = exp_a
 
 bf16_add_align_done:
-    bne t0, t1, bf16_add_skip1 # if(sign_a != sign_b) goto bf16_add_skip1
+    bne t0, t1, bf16_add_skip3 # if(sign_a != sign_b) goto bf16_add_skip1
     addi s1, t0, 0 # result_sign = sign_a
     add s3, t4, t5 # result_mant = mant_a + mant_b
     andi t6, s3, 0x100
