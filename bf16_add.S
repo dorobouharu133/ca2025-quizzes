@@ -1,3 +1,92 @@
+.data
+start: .string "BF16_ADD TESTS: \n"
+newline: .string "\n"
+pass_msg: .string "All tests passed!"
+fail_msg: .string "Test failed!"
+
+.text
+.global main
+.global bf16_add
+
+main:
+    la a0, start
+    addi a7, x0, 4
+    ecall
+
+# 1.0 + (-1.0) = 0.0
+test1:
+    addi a0, x0, 0x3F
+    slli a0, a0, 8
+    ori a0, a0, 0x80
+    addi a1, x0, 0xBF
+    slli a1, a1, 8
+    ori a1, a1, 0x80
+    jal ra, bf16_add
+    addi t1, x0, 0x00
+    bne a0, t1,test_fail 
+
+# maximum finite positive number + minimal normalized number = positive infinity
+test2:
+    addi a0, x0, 0x7F
+    slli a0, a0, 8
+    ori a0, a0, 0x7F
+    addi a1, x0, 0x7F
+    slli a1, a1, 8
+    ori a1, a1, 0x7F    
+    jal ra, bf16_add
+    addi t1, x0, 0x7F
+    slli t1, t1, 8
+    ori t1, t1, 0x80
+    bne a0, t1,test_fail 
+
+# 1.0000000 + 2^-8 = 1.000000
+test3:
+    addi a0, x0, 0x3F
+    slli a0, a0, 8
+    ori a0, a0, 0x80
+    addi a1, x0, 0x3B
+    slli a1, a1, 8
+    ori a1, a1, 0x80 
+    jal ra, bf16_add
+    addi t1, x0, 0x3F
+    slli t1, t1, 8
+    ori t1, t1, 0x80
+    bne a0, t1,test_fail
+
+# inf + (-inf) = NaN
+test4:
+    addi a0, x0, 0x7F
+    slli a0, a0, 8
+    ori a0, a0, 0x80
+    addi a1, x0, 0xFF   
+    slli a1, a1, 8
+    ori a1, a1, 0x80
+    jal ra, bf16_add
+    addi t1, x0, 0x7F
+    slli t1, t1, 8
+    ori t1, t1, 0xC0
+    bne a0, t1,test_fail  
+
+test_pass:
+    la a0, pass_msg
+    addi a7, x0, 4
+    ecall
+    jal new_line
+
+test_fail:
+    la a0, fail_msg
+    addi a7, x0, 4
+    ecall
+    
+new_line:
+    la a0, newline
+    addi a7, x0, 4
+    ecall
+
+end:
+    addi a7, x0, 10
+    ecall
+
 # a0: a
 # a1: b
 # t0: sign_a
@@ -39,6 +128,8 @@ bf16_add_skip1:
     ori t5, t5, 0x80 # mant_b |= 0x80
 
 bf16_add_skip2:
+    slli t4, t4, 3
+    slli t5, t5, 3
 bf16_add_align_branchless:
     # a0: a
     # a1: b
@@ -49,8 +140,8 @@ bf16_add_align_branchless:
     slli t6, t6, 8 
     ori t6, t6, 0xFF # mask = 0x7FFF
 
-    andi s0, a0, t6 # unsigned_a = a.bits & mask
-    andi s1, a1, t6 # unsigned_b = b.bits & mask
+    and s0, a0, t6 # unsigned_a = a.bits & mask
+    and s1, a1, t6 # unsigned_b = b.bits & mask
     slt t6, s0, s1 # t6 = (|A| < |B|) ? 1 : 0
     sub t6, x0, t6 # t6 = (|A| < |B|) ? 0xFFFF : 0x0
     
@@ -86,7 +177,7 @@ bf16_add_branchless_swap_mantissa:
     and s0, s0, t6
     xor t4, t4, s0
     xor t5, t5, s0
-
+    addi s1, t2, 0
     # s3: exp_diff
     # t6: mask
     sub s3, t2, t3 # exp_diff = exp_a - exp_b
@@ -112,7 +203,7 @@ bf16_add_sign_compare:
 bf16_add_same_sign: 
     add s3, t4, t5 # result_mant = mant_a + mant_b
 
-    andi t2, s3, 0x100 # result & 0x100, check if carry out
+    andi t2, s3, 0x800 # result & 0x800, check if carry out
     beq t2, x0, bf16_add_return 
     srli s3, s3, 1 # result_mant >>= 1
     addi s1, s1, 1 # result_exp += 1
