@@ -1,6 +1,6 @@
 .data
 newline: .string "\n"
-pass_msg: .string "All tests passed!"
+pass_msg: .string "bf16_sqrt All tests passed!"
 fail_msg: .string "Tests failed!"
 .text
 .global bf16_sqrt
@@ -71,7 +71,7 @@ test_5:
 
 # sqrt(0.000000) = 0.000000
 test_6:
-    addi a0, x0,
+    addi a0, x0, 0
     jal ra, bf16_sqrt
     addi t0, x0, 0x0000
     bne a0, t0, test_failed
@@ -83,24 +83,21 @@ test_7:
     ori a0, a0, 0xFF      
     jal ra, bf16_sqrt
     addi t0, x0, 0x5D
-    slli a0, a0, 8
-    ori a0, a0, 0xB5       
+    slli t0, t0, 8
+    ori t0, t0, 0xB5       
     bne a0, t0, test_failed
 
 test_passed:
-    auipc a0, %pcrel_hi(pass_msg)
-    addi  a0, a0, %pcrel_lo(pass_msg)
+    la a0, pass_msg
     addi a7, x0, 4            
     ecall
     jal x0, end
 test_failed:
-    auipc a0, %pcrel_hi(fail_msg)
-    addi  a0, a0, %pcrel_lo(fail_msg)
+    la a0, fail_msg
     addi a7, x0, 4            
     ecall
 end:
-    auipc a0, %pcrel_hi(newline)
-    addi  a0, a0, %pcrel_lo(newline)
+    la a0, newline
     addi a7, x0, 4            
     ecall
 
