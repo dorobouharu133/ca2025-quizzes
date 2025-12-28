@@ -224,9 +224,10 @@ bf16_add_branchless_swap_mantissa:
     # t6: mask
     sub s3, t2, t3 # exp_diff = exp_a - exp_b
     
-    addi t6, x0, 8
+    # addi t6, x0, 8  
+    addi t6, x0, 7 # check if exp_diff > 7
     slt t6, t6, s3
-    sub t6, x0, t6 # t6 = (8 < exp_diff) ? 0xFFFF : 0
+    sub t6, x0, t6 # t6 = (7 < exp_diff) ? 0xFFFF : 0
     xori t6, t6, -1 # t6 = ~t6
     
     # align mant_b
