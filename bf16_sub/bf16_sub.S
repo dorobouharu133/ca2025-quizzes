@@ -150,7 +150,7 @@ bf16_add:
     andi t5, a1, 0x7F # mant_b = b.bits & 0x7F
 
 bf16_add_special_cases:
-    li t6, 0xFF
+    addi t6, x0, 0xFF
     bne t2, t6, bf16_add_check_b_inf_nan
     beq t3, t6, bf16_add_return_exp_b_0xFF
 
