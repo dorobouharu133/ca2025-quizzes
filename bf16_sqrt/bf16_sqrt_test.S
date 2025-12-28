@@ -162,10 +162,24 @@ sqrt_while_loop: # binary_search
     bgt s0, s1, sqrt_normalize_greater_equal
     add s3, s0, s1 # s3 = (low + high)
     srli s3, s3, 1 # mid = (low + high) >> 1
-sqrt_mul: ## mul is not allowed, need to be modified !!
+sqrt_mul: # SHIFT-AND-ADD
     # s4: sq
-    # mid*mid implement
-    mul s4, s3, s3 # sq = mid * mid, need to be replaced
+    # mid*mid implemented by shift-and-add
+    addi sp, sp, -12
+    sw ra, 0(sp)
+    sw a0, 4(sp)
+    sw a1, 8(sp)
+    
+    addi a0, s3, 0
+    addi a1, s3, 0
+    jal ra, shift_and_add
+    addi a3, a0, 0
+    
+    lw ra, 0(sp)
+    lw a0, 4(sp)
+    lw a1, 8(sp)
+    addi sp, sp, 12
+    addi s4, a3, 0
     srli s4, s4, 7    
     
     # use branch
@@ -219,3 +233,35 @@ sqrt_return_pInf:
     slli a0, a0, 8
     ori  a0, a0, 0x80
     jr ra
+
+# a0: multiplicand
+# a1: multiplier
+# t0: accumulator
+# t1: multiplier_copy
+# t2: bit0
+shift_and_add:
+    addi sp, sp, -12
+    sw t0, 0(sp)
+    sw t1, 4(sp)
+    sw t2, 8(sp)
+    
+    addi t0, x0, 0
+    addi t1, a1, 0
+    andi t2, a1, 1
+shift_and_add_for_loop:
+    andi t2, t1, 1
+    beq t2, x0, shift_and_add_for_skip_add
+    add t0, t0, a0
+    
+shift_and_add_for_skip_add:    
+    slli a0, a0, 1
+    srli t1, t1, 1
+    bne t1, x0, shift_and_add_for_loop
+shfit_and_add_end:
+    addi a1, t0, 0
+    lw t0, 0(sp)
+    lw t1, 4(sp)
+    lw t2, 8(sp)
+    addi sp, sp, 12
+    addi a0, a1, 0
+    jr ra 
