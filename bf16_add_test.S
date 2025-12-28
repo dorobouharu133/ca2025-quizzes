@@ -1,12 +1,12 @@
 .data
-start: .string "BF16_MUL TESTS: \n"
+start: .string "BF16_ADD TESTS: \n"
 newline: .string "\n"
 pass_msg: .string "All tests passed!"
 fail_msg: .string "Test failed!"
 
 .text
 .global main
-.global bf16_mul
+.global bf16_add
 
 main:
     la a0, start
