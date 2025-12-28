@@ -177,7 +177,8 @@ bf16_add_branchless_swap_mantissa:
     and s0, s0, t6
     xor t4, t4, s0
     xor t5, t5, s0
-    addi s1, t2, 0
+
+    addi s1, t2, 0 # initialize s1 = exp_a (bigger)
     # s3: exp_diff
     # t6: mask
     sub s3, t2, t3 # exp_diff = exp_a - exp_b
@@ -203,7 +204,9 @@ bf16_add_sign_compare:
 bf16_add_same_sign: 
     add s3, t4, t5 # result_mant = mant_a + mant_b
 
-    andi t2, s3, 0x800 # result & 0x800, check if carry out
+    addi t2, x0, 0x80
+    slli t2, t2, 4
+    and t2, s3, t2 # result & 0x800, check if carry out
     beq t2, x0, bf16_add_return 
     srli s3, s3, 1 # result_mant >>= 1
     addi s1, s1, 1 # result_exp += 1
