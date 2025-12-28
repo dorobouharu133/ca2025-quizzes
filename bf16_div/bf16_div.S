@@ -64,21 +64,19 @@ bf16_div_division: # should be optimized
     # s2: divisor
     # s3: quotient
     # s4: counter
-    slli s1, t4, 15 # dividend = mant_a << 15
-    addi s2, t5, 0   # divisor = mant_b
+    addi s1, t4, 0   # dividend = mant_a
+    slli s2, t5, 1   # divisor = mant_b << 1
     addi s3, x0, 0   # quotient = 0
     addi t6, x0, 16  # loop times = 16
     addi s4, x0, 0   # counter = 0
 bf16_div_division_loop:
     bge s4, t6, bf16_div_division_loop_end
     slli s3, s3, 1   # quotient <<= 1
-    addi t4, x0, 15
-    sub t4, t4, s4   # t4 = 15 - i
-    sll t4, s2, t4  # temp = divisor << (15 - i)
-    
-    blt s1, t4, bf16_div_division_loop_sub_skip
+    slli s1, s1, 1    # dividend <<= 1
+
+    blt s1, s2, bf16_div_division_loop_sub_skip
 bf16_div_division_loop_sub:
-    sub s1, s1, t4 # dividend -= (divisor << (15 - i))
+    sub s1, s1, s2 # dividend -= divisor
     ori s3, s3, 1   # quotient |= 1
 bf16_div_division_loop_sub_skip:
     addi s4, s4, 1   # i++
