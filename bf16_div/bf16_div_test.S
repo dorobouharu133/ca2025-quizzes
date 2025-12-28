@@ -1,6 +1,6 @@
 .data
 newline: .string "\n"
-pass_msg: .string "All tests passed!"
+pass_msg: .string "bf16_div All tests passed!"
 fail_msg: .string "Tests failed!"
 .text
 .globl bf16_div
@@ -73,21 +73,20 @@ test_4:
 
 test_passed:
     la a0, pass_msg
-    li a7, 4            
+    addi a7, x0, 4       
     ecall
     jal x0, end
 test_failed:
     la a0, fail_msg
-    li a7, 4            
+    addi a7, x0, 4
     ecall
 end:
     la a0, newline
-    li a7, 4            
+    addi a7, x0, 4            
     ecall
 
-    li a7, 10        
+    addi a7, x0, 10
     ecall
-    
 # a0: a
 # a1: b
 # t0: sign_a
@@ -265,7 +264,7 @@ bf16_div_return_NaN:
     slli a0, a0, 8
     ori a0, a0, 0xC0
     jr ra
-
+    
 # a0: mant_a
 # t0: x
 # t1: s
