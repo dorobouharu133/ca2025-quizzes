@@ -58,7 +58,7 @@ bf16_div_b_explicit_one:
     beq t3, x0, bf16_div_division
     ori t5, t5, 0x80 # mant_b |= 0x80
 
-bf16_div_division: # should be optimized
+bf16_div_division: 
     # t6: loop times
     # s1: dividend
     # s2: divisor
